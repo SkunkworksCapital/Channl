@@ -1,0 +1,2 @@
+Hi {{name}}, Channl reminder: your appointment is on {{date}} at {{time}}. Reply YES to confirm or NO to reschedule. Reply STOP to opt out.
+

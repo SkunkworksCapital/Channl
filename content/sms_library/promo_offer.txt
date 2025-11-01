@@ -1,0 +1,2 @@
+Hi {{name}}, Channl: 10% off renewals ends Fri. Details: yourbrand.com/offers. You’re receiving promos because you opted in. Reply STOP to opt out.
+

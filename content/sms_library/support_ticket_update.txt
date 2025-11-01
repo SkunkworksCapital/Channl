@@ -1,0 +1,2 @@
+Channl update: ticket {{ticket_no}} was updated. View details at yourbrand.com/tickets/{{ticket_no}}. Reply STOP to opt out.
+

@@ -1,0 +1,2 @@
+Channl update: your order {{order_no}} shipped. Track at yourbrand.com/track/{{order_no}}. Reply STOP to opt out.
+

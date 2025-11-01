@@ -1,0 +1,36 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets / logs
+.env
+*.env
+*.log
+public/error_log
+
+# PHP/vendor
+/vendor/
+composer.lock
+
+# Node
+/node_modules/
+
+# Cache/temp
+.tmp/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+
+vendor/
+.env
+node_modules/
+.DS_Store
+storage/logs/*.log
+storage/tmp/
+coverage/
+composer.lock
+/.idea/
+/.vscode/
+

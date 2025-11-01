@@ -1,0 +1,17 @@
+name,email,phone,country
+Alice Smith,alice@example.com,+447700900111,GB
+Bob Jones,bob@example.com,+447700900222,GB
+Carol Lee,carol.lee@example.com,+15555550123,US
+Dan Okoro,dan.okoro@example.com,+2348012345678,NG
+Emma Li,emma.li@example.com,+61412345678,AU
+Felix Müller,felix.mueller@example.de,+4915123456789,DE
+Hiro Tanaka,hiro.tanaka@example.jp,+819012345678,JP
+Isabella Rossi,isabella.rossi@example.it,+393331234567,IT
+Juan Perez,juan.perez@example.mx,+525512345678,MX
+Kofi Mensah,kofi.mensah@example.gh,+233201234567,GH
+Liam O'Brien,liam.obrien@example.ie,+353851234567,IE
+Noor Khan,noor.khan@example.pk,+923001234567,PK
+Olivia Brown,olivia.brown@example.co.nz,+64211234567,NZ
+Priya Singh,priya.singh@example.in,+919812345678,IN
+Yara Haddad,yara.haddad@example.ae,+971501234567,AE
+

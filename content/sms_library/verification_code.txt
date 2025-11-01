@@ -1,0 +1,2 @@
+Channl security code: {{code}}. It expires in 10 minutes. Don’t share this code. Reply STOP to opt out.
+

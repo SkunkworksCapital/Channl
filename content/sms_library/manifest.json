@@ -1,0 +1,15 @@
+[
+  {"slug":"opt_in_confirmation","name":"Opt-in confirmation","filename":"opt_in_confirmation.txt"},
+  {"slug":"appointment_reminder","name":"Appointment reminder","filename":"appointment_reminder.txt"},
+  {"slug":"verification_code","name":"Verification code","filename":"verification_code.txt"},
+  {"slug":"order_confirmation","name":"Order confirmation","filename":"order_confirmation.txt"},
+  {"slug":"shipping_update","name":"Shipping update","filename":"shipping_update.txt"},
+  {"slug":"payment_reminder","name":"Payment reminder","filename":"payment_reminder.txt"},
+  {"slug":"trial_welcome","name":"Trial welcome","filename":"trial_welcome.txt"},
+  {"slug":"support_ticket_update","name":"Support ticket update","filename":"support_ticket_update.txt"},
+  {"slug":"feedback_request","name":"Feedback request","filename":"feedback_request.txt"},
+  {"slug":"account_alert","name":"Account alert","filename":"account_alert.txt"},
+  {"slug":"promo_offer","name":"Promotional offer (opt-in required)","filename":"promo_offer.txt"},
+  {"slug":"reengagement_nudge","name":"Re‑engagement nudge","filename":"reengagement_nudge.txt"}
+]
+

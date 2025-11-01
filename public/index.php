@@ -1,0 +1,9 @@
+<?php
+declare(strict_types=1);
+
+require_once dirname(__DIR__) . '/core/bootstrap.php';
+require_once dirname(__DIR__) . '/core/router.php';
+
+route_request();
+
+

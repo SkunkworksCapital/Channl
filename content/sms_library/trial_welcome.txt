@@ -1,0 +1,2 @@
+Welcome to your Channl trial, {{name}}. Get started: yourbrand.com/start. Questions? Reply HELP. Reply STOP to opt out.
+

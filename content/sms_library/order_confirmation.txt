@@ -1,0 +1,2 @@
+Thanks {{name}}! Channl received your order {{order_no}}. We’ll email a receipt. Need help? Reply HELP. Reply STOP to opt out.
+

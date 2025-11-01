@@ -1,0 +1,2 @@
+Hi {{name}}, Channl payment reminder for invoice {{invoice_no}} due {{due_date}}. Pay at yourbrand.com/pay/{{invoice_no}}. Reply STOP to opt out.
+

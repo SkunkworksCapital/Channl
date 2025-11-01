@@ -1,0 +1,2 @@
+Hi {{name}}, it’s Channl. How did we do? Share feedback: yourbrand.com/feedback/{{order_no}}. Reply STOP to opt out.
+

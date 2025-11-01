@@ -1,0 +1,197 @@
+-- 1) Users & Auth
+CREATE TABLE users (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  role ENUM('admin','customer','staff') NOT NULL DEFAULT 'customer',
+  credits_decimal DECIMAL(12,4) NOT NULL DEFAULT 0.0000,
+  api_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  last_login_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE api_tokens (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE, -- sha256 of raw token
+  label VARCHAR(100) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revoked_at DATETIME NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 2) Contacts & Lists
+CREATE TABLE contacts (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(160) NULL,
+  phone_e164 VARCHAR(20) NULL,
+  email VARCHAR(255) NULL,
+  tags JSON NULL,
+  valid_phone TINYINT(1) NOT NULL DEFAULT 0,
+  valid_email TINYINT(1) NOT NULL DEFAULT 0,
+  dedupe_key CHAR(40) GENERATED ALWAYS AS (SHA1(CONCAT(COALESCE(phone_e164,''),'|',COALESCE(email,'')))) STORED,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_user_dedupe (user_id, dedupe_key),
+  INDEX idx_user_phone (user_id, phone_e164),
+  INDEX idx_user_email (user_id, email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE lists (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_user_list (user_id, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE list_contacts (
+  list_id BIGINT UNSIGNED NOT NULL,
+  contact_id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (list_id, contact_id),
+  FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE,
+  FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE opt_outs (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  channel ENUM('sms','whatsapp','email') NOT NULL,
+  phone_e164 VARCHAR(20) NULL,
+  email VARCHAR(255) NULL,
+  reason VARCHAR(255) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_user_channel (user_id, channel),
+  INDEX idx_phone (phone_e164),
+  INDEX idx_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 3) Campaigns & Messages
+CREATE TABLE campaigns (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  channel ENUM('sms','whatsapp','email') NOT NULL,
+  status ENUM('draft','scheduled','sending','paused','completed','failed') NOT NULL DEFAULT 'draft',
+  template_id BIGINT UNSIGNED NULL,
+  scheduled_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_user_status (user_id, status),
+  INDEX idx_sched (scheduled_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE message_templates (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  channel ENUM('sms','whatsapp','email') NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  body TEXT NOT NULL,
+  meta JSON NULL, -- e.g., WA template components
+  approved TINYINT(1) NOT NULL DEFAULT 0, -- WhatsApp approval flag
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_user_channel_name (user_id, channel, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE campaign_recipients (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  campaign_id BIGINT UNSIGNED NOT NULL,
+  contact_id BIGINT UNSIGNED NOT NULL,
+  to_phone VARCHAR(20) NULL,
+  to_email VARCHAR(255) NULL,
+  personalized JSON NULL,
+  status ENUM('queued','sent','delivered','failed','bounced','opened','clicked') NOT NULL DEFAULT 'queued',
+  cost DECIMAL(10,5) NOT NULL DEFAULT 0.00000,
+  provider_msg_id VARCHAR(100) NULL,
+  sent_at DATETIME NULL,
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+  FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL,
+  INDEX idx_campaign_status (campaign_id, status),
+  INDEX idx_provider (provider_msg_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE message_events (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  campaign_recipient_id BIGINT UNSIGNED NOT NULL,
+  event_type ENUM('queued','sent','delivered','failed','opened','clicked','complaint') NOT NULL,
+  provider_status VARCHAR(80) NULL,
+  payload JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (campaign_recipient_id) REFERENCES campaign_recipients(id) ON DELETE CASCADE,
+  INDEX idx_rec_event (campaign_recipient_id, event_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 4) Billing
+CREATE TABLE rates (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NULL, -- null = default rate
+  channel ENUM('sms','whatsapp','email') NOT NULL,
+  price_per_unit DECIMAL(10,5) NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_user_channel (user_id, channel)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE transactions (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  type ENUM('credit_topup','debit_send','refund','adjustment') NOT NULL,
+  amount DECIMAL(12,4) NOT NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'GBP',
+  ref VARCHAR(120) NULL, -- external ref (Stripe/PayPal)
+  meta JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_user_created (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5) Files & Presigned Links
+CREATE TABLE files (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  purpose ENUM('contacts_upload','export','report') NOT NULL,
+  storage_path VARCHAR(255) NOT NULL, -- path above webroot
+  bytes BIGINT UNSIGNED NOT NULL,
+  sha256 CHAR(64) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE presigned_links (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  file_id BIGINT UNSIGNED NOT NULL,
+  token CHAR(64) NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  one_time TINYINT(1) NOT NULL DEFAULT 1,
+  used_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+  INDEX idx_exp (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 6) Webhooks & Auditing
+CREATE TABLE webhooks_in (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  source VARCHAR(40) NOT NULL, -- twilio, wa_cloud, brevo, etc.
+  event VARCHAR(60) NOT NULL,
+  payload JSON NOT NULL,
+  received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE audit_logs (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NULL,
+  actor_ip VARBINARY(16) NULL,
+  action VARCHAR(120) NOT NULL,
+  target VARCHAR(160) NULL,
+  meta JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_user_time (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,0 +1,2 @@
+Channl alert: unusual sign-in detected on your account. If this was you, ignore. If not, reset at yourbrand.com/security. Reply STOP to opt out.
+
