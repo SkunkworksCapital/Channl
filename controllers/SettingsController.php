@@ -6,6 +6,12 @@ require_once BASE_PATH . '/models/User.php';
 final class SettingsController {
   public static function profile(): void {
     self::auth();
+    // Ensure columns exist for scheduling settings
+    try { db()->exec('ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NULL'); } catch (Throwable $e) {}
+    try { db()->exec('ALTER TABLE users ADD COLUMN quiet_start TIME NULL'); } catch (Throwable $e) {}
+    try { db()->exec('ALTER TABLE users ADD COLUMN quiet_end TIME NULL'); } catch (Throwable $e) {}
+    try { db()->exec('ALTER TABLE users ADD COLUMN daily_cap_sms INT NULL'); } catch (Throwable $e) {}
+    try { db()->exec('ALTER TABLE users ADD COLUMN daily_cap_email INT NULL'); } catch (Throwable $e) {}
     $user = User::findById((int)current_user_id());
     view('settings/index', [ 'user' => $user, 'ok' => flash_get('ok'), 'error' => flash_get('error') ]);
   }
@@ -17,6 +23,11 @@ final class SettingsController {
     $email = trim((string)($_POST['email'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
     $confirm = (string)($_POST['confirm'] ?? '');
+    $timezone = trim((string)($_POST['timezone'] ?? ''));
+    $quietStart = trim((string)($_POST['quiet_start'] ?? ''));
+    $quietEnd = trim((string)($_POST['quiet_end'] ?? ''));
+    $capSms = isset($_POST['daily_cap_sms']) && is_numeric($_POST['daily_cap_sms']) ? (int)$_POST['daily_cap_sms'] : null;
+    $capEmail = isset($_POST['daily_cap_email']) && is_numeric($_POST['daily_cap_email']) ? (int)$_POST['daily_cap_email'] : null;
 
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
       flash_set('error', 'Provide a valid email.');
@@ -31,8 +42,8 @@ final class SettingsController {
       if ($chk->fetch()) { flash_set('error', 'Email already in use.'); redirect('/settings'); }
     }
 
-    $params = [ $name !== '' ? $name : null, $email, current_user_id() ];
-    db()->prepare('UPDATE users SET name = COALESCE(?, name), email = ? WHERE id = ?')->execute($params);
+    $params = [ $name !== '' ? $name : null, $email, $timezone !== '' ? $timezone : null, ($quietStart !== '' ? $quietStart : null), ($quietEnd !== '' ? $quietEnd : null), $capSms, $capEmail, current_user_id() ];
+    db()->prepare('UPDATE users SET name = COALESCE(?, name), email = ?, timezone = COALESCE(?, timezone, "UTC"), quiet_start = COALESCE(?, quiet_start), quiet_end = COALESCE(?, quiet_end), daily_cap_sms = COALESCE(?, daily_cap_sms), daily_cap_email = COALESCE(?, daily_cap_email) WHERE id = ?')->execute($params);
     audit_log('user.profile_updated', 'user', current_user_id(), [ 'old_email' => $u['email'], 'new_email' => $email, 'old_name' => $u['name'], 'new_name' => ($name !== '' ? $name : $u['name']) ]);
 
     if ($password !== '') {

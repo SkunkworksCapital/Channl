@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once BASE_PATH . '/services/SmtpClient.php';
 require_once BASE_PATH . '/services/SendgridClient.php';
+require_once BASE_PATH . '/core/scheduler.php';
 
 final class EmailController {
   public static function form(): void {
@@ -18,6 +19,8 @@ final class EmailController {
     $body = trim((string)($_POST['body'] ?? ''));
     $listId = isset($_POST['list_id']) ? (int)$_POST['list_id'] : 0;
     $templateId = isset($_POST['template_id']) ? (int)$_POST['template_id'] : 0;
+    $sendAtLocal = trim((string)($_POST['send_at'] ?? ''));
+    $uid = (int)current_user_id();
     if ($listId === 0 && ($to === '' || $subject === '' || $body === '')) {
       flash_set('error', 'To, subject and body are required (or choose a list).');
       redirect('/email/send');
@@ -100,6 +103,20 @@ final class EmailController {
       }
       if ($subject === '' || $body === '') { flash_set('error', 'Please select a template or enter a subject and body.'); redirect('/email/send'); }
 
+      // Scheduling for bulk list email
+      if ($sendAtLocal !== '') {
+        ensure_scheduled_jobs_table();
+        $tz = user_timezone($uid);
+        $utc = convert_local_to_utc($sendAtLocal, $tz);
+        if ($utc && strtotime($utc) > time()) {
+          $payload = json_encode([ 'list_id' => $listId, 'subject' => $subject, 'body' => $body ], JSON_UNESCAPED_SLASHES);
+          db()->prepare('INSERT INTO scheduled_jobs (user_id, channel, mode, payload, scheduled_at) VALUES (?, "email", "list", ?, ?)')
+            ->execute([$uid, $payload, $utc]);
+          flash_set('ok', 'Bulk email scheduled for ' . h($sendAtLocal) . ' (' . h($tz) . ').');
+          redirect('/email/send');
+        }
+      }
+
       // send to members of the selected list only, with personalization
       $q = db()->prepare('SELECT c.id, c.name, c.email, c.country FROM contact_list_members m JOIN contacts c ON c.id = m.contact_id WHERE m.list_id = ? AND c.email IS NOT NULL AND c.email <> ""');
       $q->execute([$listId]);
@@ -138,6 +155,20 @@ final class EmailController {
       flash_set('error', 'Insufficient credits. Please top up on Billing.');
       redirect('/billing');
     }
+    // Scheduling for single email
+    if ($sendAtLocal !== '') {
+      ensure_scheduled_jobs_table();
+      $tz = user_timezone($uid);
+      $utc = convert_local_to_utc($sendAtLocal, $tz);
+      if ($utc && strtotime($utc) > time()) {
+        $payload = json_encode([ 'to' => $to, 'subject' => $subject, 'body' => $body ], JSON_UNESCAPED_SLASHES);
+        db()->prepare('INSERT INTO scheduled_jobs (user_id, channel, mode, payload, scheduled_at) VALUES (?, "email", "single", ?, ?)')
+          ->execute([$uid, $payload, $utc]);
+        flash_set('ok', 'Email scheduled for ' . h($sendAtLocal) . ' (' . h($tz) . ').');
+        redirect('/email/send');
+      }
+    }
+
     $res = $mailer->send($to, $subject, $body);
     $statusText = $res['ok'] ? 'sent' : 'error';
     $stmt = db()->prepare('INSERT INTO messages (user_id, channel, provider, to_addr, from_addr, body, provider_message_id, status) VALUES (?, "email", ?, ?, ?, ?, NULL, ?)');

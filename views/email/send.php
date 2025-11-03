@@ -53,6 +53,13 @@
       <input id="subject_test" name="subject" type="text" required>
       <label for="body_test">Message</label>
       <textarea id="body_test" name="body" rows="6" required></textarea>
+      <div style="display:flex;gap:12px;align-items:end">
+        <div style="flex:1">
+          <label for="send_at_single_email">Send at (local, optional)</label>
+          <input id="send_at_single_email" name="send_at" type="datetime-local">
+          <p class="subtle">Leave blank to send now. Uses your time zone in Settings.</p>
+        </div>
+      </div>
       <button class="btn" type="submit">Send test</button>
     </form>
 
@@ -77,6 +84,13 @@
       <input id="subject_bulk" name="subject" type="text" required readonly>
       <label for="body_bulk">Message</label>
       <textarea id="body_bulk" name="body" rows="6" required readonly></textarea>
+      <div style="display:flex;gap:12px;align-items:end;margin-top:8px">
+        <div style="flex:1">
+          <label for="send_at_bulk_email">Send at (local, optional)</label>
+          <input id="send_at_bulk_email" name="send_at" type="datetime-local">
+          <p class="subtle">Leave blank to send now. Uses your time zone in Settings.</p>
+        </div>
+      </div>
       <button class="btn" type="submit">Send to list</button>
       <p class="subtle">Tip: Selecting a template will populate subject and message. If none is selected, the list's default template is used when available.</p>
     </form>

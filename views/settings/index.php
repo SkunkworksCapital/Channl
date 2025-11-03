@@ -35,6 +35,39 @@
       <input id="password" name="password" type="password">
       <label for="confirm">Confirm password</label>
       <input id="confirm" name="confirm" type="password">
+      <hr style="border:none;border-top:1px solid #374151;margin:16px 0">
+      <h3>Messaging preferences</h3>
+      <label for="timezone">Time zone</label>
+      <?php $tz = isset($user['timezone']) && $user['timezone'] ? $user['timezone'] : 'UTC'; ?>
+      <select id="timezone" name="timezone">
+        <?php
+          $tzOpts = ['UTC','America/New_York','America/Los_Angeles','Europe/London','Europe/Berlin','Asia/Kolkata','Asia/Singapore','Australia/Sydney'];
+          foreach ($tzOpts as $opt) {
+            $sel = ($tz === $opt) ? ' selected' : '';
+            echo '<option value="' . h($opt) . '"' . $sel . '>' . h($opt) . '</option>';
+          }
+        ?>
+      </select>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <label for="quiet_start">Quiet hours start (local)</label>
+          <input id="quiet_start" name="quiet_start" type="time" value="<?= h($user['quiet_start'] ?? '') ?>">
+        </div>
+        <div style="flex:1">
+          <label for="quiet_end">Quiet hours end (local)</label>
+          <input id="quiet_end" name="quiet_end" type="time" value="<?= h($user['quiet_end'] ?? '') ?>">
+        </div>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <label for="daily_cap_sms">Daily SMS cap (0 = unlimited)</label>
+          <input id="daily_cap_sms" name="daily_cap_sms" type="number" min="0" value="<?= h((string)($user['daily_cap_sms'] ?? '0')) ?>">
+        </div>
+        <div style="flex:1">
+          <label for="daily_cap_email">Daily Email cap (0 = unlimited)</label>
+          <input id="daily_cap_email" name="daily_cap_email" type="number" min="0" value="<?= h((string)($user['daily_cap_email'] ?? '0')) ?>">
+        </div>
+      </div>
       <button class="btn" type="submit">Save</button>
     </form>
   </div>

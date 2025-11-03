@@ -24,6 +24,7 @@ Omnichannel micro-CRM to send and track SMS, WhatsApp and Email with simple list
   - Single test send; template-based bulk send to a list
   - Autofill subject/body; recipients preview modal
   - Supports SMTP (default) or SendGrid v3 API
+  - Schedule sends for the future; honors quiet hours and daily caps
 - Approvals (admin): review/approve or reject pending outbound before send
 - Billing: simple balance/credits with per-channel rate estimates
 - Exports (admin): CSV export for audits and messages
@@ -47,6 +48,17 @@ Omnichannel micro-CRM to send and track SMS, WhatsApp and Email with simple list
 - `views/` dark-themed pages
 - `sql/schema.sql` reference schema (app also creates tables lazily)
 - `content/sms_library/` curated SMS template library
+
+## Scheduling, Quiet Hours, and Caps
+- Schedule future sends on SMS and Email forms using "Send at (local)".
+- Set your time zone, quiet hours, and optional daily caps in `Settings`.
+- A worker processes due jobs and enforces quiet hours and caps. Run it via cron:
+```bash
+* * * * * php /path/to/Channl/bin/scheduler.php >> /var/log/channl_scheduler.log 2>&1
+```
+Notes
+- Quiet hours defer sends to quiet end in your local time.
+- Daily caps (0 = unlimited) postpone excess to the next day.
 
 ## Requirements
 - PHP extensions: `pdo_mysql`, `curl`, `json`, `session`

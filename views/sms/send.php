@@ -55,6 +55,13 @@
       </div>
       <label for="body_test">Message</label>
       <textarea id="body_test" name="body" rows="3" required></textarea>
+      <div style="display:flex;gap:12px;align-items:end">
+        <div style="flex:1">
+          <label for="send_at_single">Send at (local, optional)</label>
+          <input id="send_at_single" name="send_at" type="datetime-local">
+          <p class="subtle">Leave blank to send now. Uses your time zone in Settings.</p>
+        </div>
+      </div>
       <button class="btn" type="submit">Send</button>
     </form>
 
@@ -77,6 +84,13 @@
       <div id="tplPreview" class="subtle" style="margin:8px 0 0 0;display:none"></div>
       <label for="body_bulk">Message</label>
       <textarea id="body_bulk" name="body" rows="4" required readonly></textarea>
+      <div style="display:flex;gap:12px;align-items:end;margin-top:8px">
+        <div style="flex:1">
+          <label for="send_at_bulk">Send at (local, optional)</label>
+          <input id="send_at_bulk" name="send_at" type="datetime-local">
+          <p class="subtle">Leave blank to send now. Uses your time zone in Settings.</p>
+        </div>
+      </div>
       <button class="btn" type="submit">Send to list</button>
       <p class="subtle">Tip: Selecting a template will populate the message. If none is selected, the list's default template is used when available.</p>
     </form>

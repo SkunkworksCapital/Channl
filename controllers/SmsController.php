@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once BASE_PATH . '/services/SmsTwilio.php';
+require_once BASE_PATH . '/core/scheduler.php';
 
 final class SmsController {
   public static function sendForm(): void {
@@ -149,6 +150,8 @@ final class SmsController {
     $body = trim((string)($_POST['body'] ?? ''));
     $listId = isset($_POST['list_id']) ? (int)$_POST['list_id'] : 0;
     $templateId = isset($_POST['template_id']) ? (int)$_POST['template_id'] : 0;
+    $sendAtLocal = trim((string)($_POST['send_at'] ?? ''));
+    $uid = (int)current_user_id();
     $cfg = $GLOBALS['CONFIG']['integrations']['sms'] ?? [];
     $svc = new SmsTwilio($cfg);
 
@@ -229,6 +232,20 @@ final class SmsController {
         } catch (Throwable $e) { /* ignore */ }
       }
       if ($body === '') { flash_set('error', 'Please select a template or enter a message.'); redirect('/sms/send'); }
+
+      // Scheduling for bulk list send
+      if ($sendAtLocal !== '') {
+        ensure_scheduled_jobs_table();
+        $tz = user_timezone($uid);
+        $utc = convert_local_to_utc($sendAtLocal, $tz);
+        if ($utc && strtotime($utc) > time()) {
+          $payload = json_encode([ 'list_id' => $listId, 'body' => $body ], JSON_UNESCAPED_SLASHES);
+          db()->prepare('INSERT INTO scheduled_jobs (user_id, channel, mode, payload, scheduled_at) VALUES (?, "sms", "list", ?, ?)')
+            ->execute([$uid, $payload, $utc]);
+          flash_set('ok', 'Bulk SMS scheduled for ' . h($sendAtLocal) . ' (' . h($tz) . ').');
+          redirect('/sms/send');
+        }
+      }
       $q = db()->prepare('SELECT c.id, c.name, c.email, c.phone, c.country FROM contact_list_members m JOIN contacts c ON c.id = m.contact_id WHERE m.list_id = ? AND c.phone IS NOT NULL');
       $q->execute([$listId]);
       $recipients = $q->fetchAll();
@@ -272,6 +289,19 @@ final class SmsController {
     if ($to === '' || $body === '') {
       flash_set('error', 'To and body are required.');
       redirect('/sms/send');
+    }
+    // Scheduling for single send
+    if ($sendAtLocal !== '') {
+      ensure_scheduled_jobs_table();
+      $tz = user_timezone($uid);
+      $utc = convert_local_to_utc($sendAtLocal, $tz);
+      if ($utc && strtotime($utc) > time()) {
+        $payload = json_encode([ 'to' => $to, 'body' => $body ], JSON_UNESCAPED_SLASHES);
+        db()->prepare('INSERT INTO scheduled_jobs (user_id, channel, mode, payload, scheduled_at) VALUES (?, "sms", "single", ?, ?)')
+          ->execute([$uid, $payload, $utc]);
+        flash_set('ok', 'SMS scheduled for ' . h($sendAtLocal) . ' (' . h($tz) . ').');
+        redirect('/sms/send');
+      }
     }
     // single send credits
     $rate = rate_for_channel('sms');
