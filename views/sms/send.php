@@ -49,25 +49,23 @@
     <h3>Single SMS</h3>
     <form method="post" action="/sms/send" style="margin-bottom:24px">
       <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+      <input type="hidden" name="send_at" value="">
       <div id="toRow">
         <label for="to">To (E.164, e.g. +15551234567)</label>
         <input id="to" name="to" type="text" required>
       </div>
       <label for="body_test">Message</label>
       <textarea id="body_test" name="body" rows="3" required></textarea>
-      <div style="display:flex;gap:12px;align-items:end">
-        <div style="flex:1">
-          <label for="send_at_single">Send at (local, optional)</label>
-          <input id="send_at_single" name="send_at" type="datetime-local">
-          <p class="subtle">Leave blank to send now. Uses your time zone in Settings.</p>
-        </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="btn" type="submit">Send now</button>
+        <button class="btn" type="button" data-action="open-schedule">Schedule…</button>
       </div>
-      <button class="btn" type="submit">Send</button>
     </form>
 
     <h3>Send from template to a list</h3>
     <form method="post" action="/sms/send">
       <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+      <input type="hidden" name="send_at" value="">
       <label for="list_id">List</label>
       <div style="display:flex;gap:8px;align-items:center">
       <select id="list_id" name="list_id" required style="flex:1">
@@ -84,17 +82,38 @@
       <div id="tplPreview" class="subtle" style="margin:8px 0 0 0;display:none"></div>
       <label for="body_bulk">Message</label>
       <textarea id="body_bulk" name="body" rows="4" required readonly></textarea>
-      <div style="display:flex;gap:12px;align-items:end;margin-top:8px">
-        <div style="flex:1">
-          <label for="send_at_bulk">Send at (local, optional)</label>
-          <input id="send_at_bulk" name="send_at" type="datetime-local">
-          <p class="subtle">Leave blank to send now. Uses your time zone in Settings.</p>
-        </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="btn" type="submit">Send to list now</button>
+        <button class="btn" type="button" data-action="open-schedule">Schedule…</button>
       </div>
-      <button class="btn" type="submit">Send to list</button>
       <p class="subtle">Tip: Selecting a template will populate the message. If none is selected, the list's default template is used when available.</p>
     </form>
     <p><a href="/">Home</a></p>
+  </div>
+  <div class="card">
+    <h3>Recent SMS Sent</h3>
+    <?php
+      $history = [];
+      try {
+        $h = db()->prepare('SELECT to_addr, status, provider_message_id, created_at FROM messages WHERE user_id = ? AND channel = "sms" AND (status = "sent" OR status = "error") ORDER BY id DESC LIMIT 200');
+        $h->execute([current_user_id()]);
+        $history = $h->fetchAll();
+      } catch (Throwable $e) {}
+    ?>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr><th style="text-align:left;border-bottom:1px solid #374151;padding:8px 6px">To</th><th style="text-align:left;border-bottom:1px solid #374151;padding:8px 6px">Status</th><th style="text-align:left;border-bottom:1px solid #374151;padding:8px 6px">Provider ID</th><th style="text-align:left;border-bottom:1px solid #374151;padding:8px 6px">When</th></tr></thead>
+      <tbody>
+        <?php if (empty($history)) { echo '<tr><td colspan="4" class="subtle" style="padding:8px 6px">No recent sends.</td></tr>'; } else { foreach ($history as $r) {
+          echo '<tr>';
+          echo '<td style="border-bottom:1px solid #374151;padding:8px 6px">' . h($r['to_addr']) . '</td>';
+          echo '<td style="border-bottom:1px solid #374151;padding:8px 6px">' . h($r['status']) . '</td>';
+          echo '<td style="border-bottom:1px solid #374151;padding:8px 6px">' . h($r['provider_message_id'] ?? '') . '</td>';
+          echo '<td style="border-bottom:1px solid #374151;padding:8px 6px">' . h($r['created_at']) . '</td>';
+          echo '</tr>';
+        } }
+        ?>
+      </tbody>
+    </table>
   </div>
   <script>
     (function(){
@@ -153,6 +172,48 @@
         document.body.appendChild(overlay);
       }
       sync();
+      // Scheduling modal
+      var activeForm = null;
+      function openScheduleModal(forForm){
+        activeForm = forForm;
+        var overlay = document.createElement('div');
+        overlay.id = 'scheduleOverlay';
+        overlay.style.position='fixed'; overlay.style.left='0'; overlay.style.top='0'; overlay.style.right='0'; overlay.style.bottom='0'; overlay.style.background='rgba(0,0,0,0.6)'; overlay.style.zIndex='1000';
+        var modal = document.createElement('div');
+        modal.style.maxWidth='420px'; modal.style.margin='80px auto'; modal.style.background='#111827'; modal.style.border='1px solid #374151'; modal.style.borderRadius='12px'; modal.style.padding='16px';
+        var h3 = document.createElement('h3'); h3.textContent='Schedule send'; modal.appendChild(h3);
+        var tzText = document.createElement('p'); tzText.className='subtle'; tzText.textContent='Times are in your Settings time zone.'; modal.appendChild(tzText);
+        var row = document.createElement('div'); row.style.display='flex'; row.style.gap='8px';
+        var date = document.createElement('input'); date.type='date'; date.style.flex='1';
+        var time = document.createElement('input'); time.type='time'; time.style.flex='1';
+        // default +30 minutes
+        var now = new Date(Date.now() + 30*60000);
+        date.value = now.toISOString().slice(0,10);
+        time.value = now.toISOString().slice(11,16);
+        row.appendChild(date); row.appendChild(time); modal.appendChild(row);
+        var actions = document.createElement('div'); actions.style.display='flex'; actions.style.justifyContent='flex-end'; actions.style.gap='8px'; actions.style.marginTop='12px';
+        var cancel = document.createElement('button'); cancel.className='btn'; cancel.textContent='Close'; cancel.onclick=function(){ document.body.removeChild(overlay); };
+        var confirm = document.createElement('button'); confirm.className='btn'; confirm.textContent='Schedule'; confirm.onclick=function(){
+          if(!activeForm) return;
+          var d = date.value; var t = time.value;
+          if(!d || !t){ alert('Pick date and time'); return; }
+          var sendAt = d + ' ' + t + ':00';
+          var input = activeForm.querySelector('input[name="send_at"]');
+          if(input){ input.value = sendAt; }
+          document.body.removeChild(overlay);
+          activeForm.submit();
+        };
+        actions.appendChild(cancel); actions.appendChild(confirm); modal.appendChild(actions);
+        overlay.appendChild(modal);
+        overlay.addEventListener('click', function(e){ if(e.target===overlay){ document.body.removeChild(overlay); } });
+        document.body.appendChild(overlay);
+      }
+      document.querySelectorAll('button[data-action="open-schedule"]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var form = btn.closest('form');
+          if(form) openScheduleModal(form);
+        });
+      });
     })();
   </script>
   </div>
