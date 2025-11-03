@@ -10,8 +10,13 @@ function route_request(): void {
   }
   // Normalize multiple slashes and trailing slashes
   $path = preg_replace('#/+#', '/', $path);
+  if (function_exists('error_log')) { error_log('[ROUTE] ' . $method . ' ' . $path); }
 
   if ($method === 'GET' && $path === '/') {
+    if (function_exists('current_user_id') && !current_user_id()) {
+      view('landing', [ 'env' => $GLOBALS['CONFIG']['app_env'] ?? 'prod' ]);
+      return;
+    }
     $stats = null;
     if (function_exists('current_user_id') && current_user_id()) {
       try {
@@ -66,6 +71,12 @@ function route_request(): void {
       'env' => $GLOBALS['CONFIG']['app_env'] ?? 'prod',
       'stats' => $stats,
     ]);
+    return;
+  }
+
+  // Explicit landing page route (available even when logged in)
+  if ($method === 'GET' && $path === '/landing') {
+    view('landing', [ 'env' => $GLOBALS['CONFIG']['app_env'] ?? 'prod' ]);
     return;
   }
 
@@ -178,8 +189,35 @@ function route_request(): void {
   if ($method === 'POST' && $path === '/email/send') { EmailController::send(); return; }
   if ($method === 'GET' && $path === '/email/inbox') { EmailController::inbox(); return; }
 
+  // Billing
+  require_once BASE_PATH . '/controllers/BillingController.php';
+  if ($method === 'GET' && $path === '/billing') { BillingController::index(); return; }
+  if ($method === 'GET' && $path === '/billing/buy') { BillingController::gift(); return; }
+  if ($method === 'POST' && $path === '/billing/buy') { BillingController::buy(); return; }
+
+  // Settings
+  require_once BASE_PATH . '/controllers/SettingsController.php';
+  if ($method === 'GET' && $path === '/settings') { SettingsController::profile(); return; }
+  if ($method === 'POST' && $path === '/settings') { SettingsController::update(); return; }
+
+  // API
+  require_once BASE_PATH . '/controllers/ApiController.php';
+  if ($method === 'GET' && $path === '/api/balance') { ApiController::balance(); return; }
+
+  // Approvals (admin)
+  require_once BASE_PATH . '/controllers/ApprovalsController.php';
+  if ($method === 'GET' && $path === '/approvals') { ApprovalsController::index(); return; }
+  if ($method === 'POST' && preg_match('#^/approvals/(\d+)/approve$#', $path, $m)) { ApprovalsController::approve((int)$m[1]); return; }
+  if ($method === 'POST' && preg_match('#^/approvals/(\d+)/reject$#', $path, $m)) { ApprovalsController::reject((int)$m[1]); return; }
+
+  // Exports (admin)
+  require_once BASE_PATH . '/controllers/ExportsController.php';
+  if ($method === 'GET' && $path === '/exports/audit.csv') { ExportsController::auditCsv(); return; }
+  if ($method === 'GET' && $path === '/exports/messages.csv') { ExportsController::messagesCsv(); return; }
+
   http_response_code(404);
   echo 'Not Found';
+  if (function_exists('error_log')) { error_log('[ROUTE_404] ' . $method . ' ' . $path); }
 }
 
 

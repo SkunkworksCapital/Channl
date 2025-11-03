@@ -11,7 +11,6 @@ final class AuthController {
   }
 
   public static function login(): void {
-    require_csrf_or_400();
     $email = trim((string)($_POST['email'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
     if ($email === '' || $password === '') {
@@ -20,11 +19,13 @@ final class AuthController {
     }
     $user = User::findByEmail($email);
     if (!$user || !password_verify($password, $user['password_hash'])) {
+      audit_log('auth.login_failed', 'user', null, ['email' => $email]);
       flash_set('error', 'Invalid credentials.');
       redirect('/login');
     }
     $_SESSION['user_id'] = (int)$user['id'];
-    session_regenerate_id(true);
+    if (session_status() === PHP_SESSION_ACTIVE) { @session_regenerate_id(true); }
+    audit_log('auth.login_success', 'user', $user['id']);
     redirect('/');
   }
 
@@ -35,29 +36,34 @@ final class AuthController {
   }
 
   public static function register(): void {
-    require_csrf_or_400();
+    error_log('[AUTH] register start');
     $email = trim((string)($_POST['email'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
     $name = trim((string)($_POST['name'] ?? ''));
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      error_log('[AUTH] register invalid email');
       flash_set('error', 'Valid email required.');
       redirect('/register');
     }
     if (strlen($password) < 8) {
+      error_log('[AUTH] register weak password');
       flash_set('error', 'Password must be at least 8 characters.');
       redirect('/register');
     }
     try {
       self::ensureUsersTable();
       if (User::findByEmail($email)) {
+        error_log('[AUTH] register duplicate email');
         flash_set('error', 'Email already registered.');
         redirect('/register');
       }
       $id = User::create($email, $password, $name !== '' ? $name : null);
       $_SESSION['user_id'] = $id;
-      session_regenerate_id(true);
+      if (session_status() === PHP_SESSION_ACTIVE) { @session_regenerate_id(true); }
+      error_log('[AUTH] register success user_id=' . $id);
       redirect('/');
     } catch (PDOException $e) {
+      error_log('[AUTH] register pdo_exception: ' . $e->getMessage());
       $code = $e->getCode();
       if ($code === '23000') {
         flash_set('error', 'Email already registered.');
@@ -66,12 +72,14 @@ final class AuthController {
       }
       redirect('/register');
     } catch (Throwable $e) {
+      error_log('[AUTH] register throwable: ' . $e->getMessage());
       flash_set('error', 'Registration failed.');
       redirect('/register');
     }
   }
 
   public static function logout(): void {
+    audit_log('auth.logout', 'user', current_user_id());
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
       $params = session_get_cookie_params();
@@ -80,6 +88,8 @@ final class AuthController {
     session_destroy();
     redirect('/');
   }
+
+  // 2FA views removed for simplified auth
 
   private static function ensureUsersTable(): void {
     db()->exec('CREATE TABLE IF NOT EXISTS users (

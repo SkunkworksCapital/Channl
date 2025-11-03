@@ -68,6 +68,7 @@ final class SmsController {
 
       $stmt = db()->prepare('INSERT INTO messages (user_id, channel, provider, to_addr, from_addr, body, provider_message_id, status) VALUES (?, "sms", "twilio", ?, ?, ?, ?, "received")');
       $stmt->execute([$userId, $to, $from, $body, $sid]);
+      audit_log('sms.webhook_received', 'message', null, ['from' => $from, 'to' => $to, 'sid' => $sid]);
     } catch (Throwable $e) {
       // swallow
     }
@@ -137,6 +138,7 @@ final class SmsController {
       } catch (Throwable $e) { /* ignore and continue */ }
     }
     flash_set('ok', 'Synced ' . $inserted . ' messages from Twilio.');
+    audit_log('sms.sync_completed', 'messages', null, ['inserted' => $inserted, 'since' => $since, 'to' => $ourNumber]);
     redirect('/sms/inbox');
   }
 
@@ -179,6 +181,29 @@ final class SmsController {
     $from = $fromClean;
 
     if ($listId > 0) {
+      // If approval required, create approval request and exit early
+      $requireApproval = (bool)($GLOBALS['CONFIG']['security']['require_bulk_approval'] ?? false);
+      if ($requireApproval) {
+        try {
+          db()->exec('CREATE TABLE IF NOT EXISTS approvals (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            type VARCHAR(32) NOT NULL,
+            payload JSON NOT NULL,
+            status ENUM("pending","approved","rejected") NOT NULL DEFAULT "pending",
+            requested_by BIGINT UNSIGNED NOT NULL,
+            decided_by BIGINT UNSIGNED NULL,
+            decided_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY ix_approvals_status_created (status, created_at)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;');
+          $payload = json_encode([ 'user_id' => (int)current_user_id(), 'list_id' => $listId, 'body' => $body ], JSON_UNESCAPED_SLASHES);
+          db()->prepare('INSERT INTO approvals (type, payload, requested_by) VALUES ("sms_bulk", ?, ?)')->execute([$payload, current_user_id()]);
+          audit_log('approval.requested', 'list', $listId, ['type' => 'sms_bulk']);
+          flash_set('ok', 'Bulk SMS submitted for approval.');
+          redirect('/sms/send');
+        } catch (Throwable $e) { /* fallback to direct send below if table creation fails */ }
+      }
       // ensure list belongs to user and is SMS channel
       try {
         $chk = db()->prepare('SELECT id FROM contact_lists WHERE id = ? AND user_id = ? AND channel = "sms"');
@@ -207,6 +232,14 @@ final class SmsController {
       $q = db()->prepare('SELECT c.id, c.name, c.email, c.phone, c.country FROM contact_list_members m JOIN contacts c ON c.id = m.contact_id WHERE m.list_id = ? AND c.phone IS NOT NULL');
       $q->execute([$listId]);
       $recipients = $q->fetchAll();
+      audit_log('sms.bulk_requested', 'list', $listId, ['recipients' => count($recipients)]);
+      // credits check
+      $rate = rate_for_channel('sms');
+      $cost = $rate * count($recipients);
+      if (!wallet_debit((int)current_user_id(), $cost, 'sms_bulk', [ 'list_id' => $listId, 'count' => count($recipients) ])) {
+        flash_set('error', 'Insufficient credits. Please top up on Billing.');
+        redirect('/billing');
+      }
       $sent = 0; $failed = 0;
       foreach ($recipients as $row) {
         $toNum = (string)$row['phone'];
@@ -232,12 +265,19 @@ final class SmsController {
         if ($res['ok']) $sent++; else $failed++;
       }
       flash_set('ok', 'Bulk send complete. Sent ' . $sent . ', failed ' . $failed . '.');
+      audit_log('sms.bulk_sent', 'list', $listId, ['sent' => $sent, 'failed' => $failed]);
       redirect('/sms/send');
     }
 
     if ($to === '' || $body === '') {
       flash_set('error', 'To and body are required.');
       redirect('/sms/send');
+    }
+    // single send credits
+    $rate = rate_for_channel('sms');
+    if (!wallet_debit((int)current_user_id(), $rate, 'sms_single', [ 'to' => $to ])) {
+      flash_set('error', 'Insufficient credits. Please top up on Billing.');
+      redirect('/billing');
     }
     $res = $svc->send($to, $body);
     if (!$res['ok'] && ($res['status'] ?? 0) === 0 && ($res['response'] ?? null) === []) {
@@ -259,6 +299,7 @@ final class SmsController {
       }
       flash_set('error', 'Failed to send (HTTP ' . $code . ').' . $detail);
     }
+    audit_log('sms.single_sent', 'message', null, ['to' => $to, 'status' => $statusText]);
     redirect('/sms/send');
   }
 

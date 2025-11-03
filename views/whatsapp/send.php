@@ -23,7 +23,7 @@
     <div class="content">
   <div class="container">
   <div class="card">
-    <h2>Send WhatsApp</h2>
+    <h2>Send WhatsApp <span class="badge" style="background:#7c3aed">Coming soon</span></h2>
     <?php if (!empty($error)): ?><p class="err"><?= h($error) ?></p><?php endif; ?>
     <?php if (!empty($ok)): ?><p class="ok"><?= h($ok) ?></p><?php endif; ?>
     <form method="post" action="/whatsapp/send">

@@ -38,6 +38,12 @@ final class WhatsappController {
       KEY ix_messages_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;');
 
+    // debit credits
+    $rate = rate_for_channel('whatsapp');
+    if (!wallet_debit((int)current_user_id(), $rate, 'whatsapp_single', [ 'to' => $to ])) {
+      flash_set('error', 'Insufficient credits. Please top up on Billing.');
+      redirect('/billing');
+    }
     $res = $svc->sendText($to, $body);
     $statusText = ($res['ok'] ?? false) ? 'sent' : 'error';
     $stmt = db()->prepare('INSERT INTO messages (user_id, channel, provider, to_addr, from_addr, body, provider_message_id, status) VALUES (?, "whatsapp", "meta", ?, NULL, ?, ?, ?)');

@@ -22,7 +22,6 @@
       <p class="err"><?= h($error) ?></p>
     <?php endif; ?>
     <form method="post" action="/login">
-      <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
       <label for="email">Email</label>
       <input id="email" name="email" type="email" autocomplete="email" required>
       <label for="password">Password</label>

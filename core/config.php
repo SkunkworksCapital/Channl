@@ -15,6 +15,7 @@ return [
   ],
   'security' => [
     'csrf_key' => getenv('CSRF_KEY') ?: 'random-32-bytes',
+    'require_bulk_approval' => (function(){ $v = getenv('REQUIRE_BULK_APPROVAL'); if ($v === false) return false; $v = strtolower(trim($v)); return in_array($v, ['1','true','yes','on'], true); })(),
   ],
   'rates' => [
     'sms' => (float)(getenv('RATE_SMS') ?: 0.03),

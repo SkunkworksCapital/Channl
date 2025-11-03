@@ -49,7 +49,7 @@ function http_request(string $method, string $url, array $opts = []): array {
 
 function log_message_event(?string $messageId, string $channel, string $provider, string $eventType, ?int $statusCode, $requestPayload, $responsePayload): void {
   try {
-    $stmt = db()->prepare('INSERT INTO message_events (message_id, channel, provider, event_type, status_code, request_json, response_json) VALUES (?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON))');
+    $stmt = db()->prepare('INSERT INTO message_events (message_id, channel, provider, event_type, status_code, request_json, response_json) VALUES (?, ?, ?, ?, ?, ?, ?)');
     $req = json_encode($requestPayload, JSON_UNESCAPED_SLASHES);
     $res = json_encode($responsePayload, JSON_UNESCAPED_SLASHES);
     $stmt->execute([$messageId, $channel, $provider, $eventType, $statusCode, $req, $res]);
