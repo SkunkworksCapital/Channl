@@ -26,6 +26,7 @@
         <a href="/exports/messages.csv" style="padding-left:20px">Export Messages CSV</a>
         <?php endif; ?>
         <span style="display:block;color:#9ca3af;padding:8px 10px;margin-top:8px">Settings</span>
+        <a href="/scheduled" style="padding-left:20px">Scheduled Jobs</a>
         <a href="/billing" style="padding-left:20px">Credits & Billing</a>
         <a href="/settings" style="padding-left:20px">User Settings</a>
       <?php else: ?>

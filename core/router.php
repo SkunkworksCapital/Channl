@@ -215,6 +215,11 @@ function route_request(): void {
   if ($method === 'GET' && $path === '/exports/audit.csv') { ExportsController::auditCsv(); return; }
   if ($method === 'GET' && $path === '/exports/messages.csv') { ExportsController::messagesCsv(); return; }
 
+  // Scheduled jobs
+  require_once BASE_PATH . '/controllers/ScheduledController.php';
+  if ($method === 'GET' && $path === '/scheduled') { ScheduledController::index(); return; }
+  if ($method === 'POST' && preg_match('#^/scheduled/(\d+)/cancel$#', $path, $m)) { require_csrf_or_400(); ScheduledController::cancel((int)$m[1]); return; }
+
   http_response_code(404);
   echo 'Not Found';
   if (function_exists('error_log')) { error_log('[ROUTE_404] ' . $method . ' ' . $path); }
