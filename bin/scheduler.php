@@ -93,6 +93,17 @@ foreach ($jobs as $job) {
         $rate = rate_for_channel('sms');
         $cost = $rate * count($recipients);
         if (!wallet_debit($uid, $cost, 'sms_bulk_scheduled', [ 'list_id' => $listId, 'count' => count($recipients) ])) { throw new RuntimeException('Insufficient credits'); }
+        // Ensure link table exists
+        db()->exec('CREATE TABLE IF NOT EXISTS message_list_links (
+          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+          user_id BIGINT UNSIGNED NOT NULL,
+          list_id BIGINT UNSIGNED NOT NULL,
+          message_id BIGINT UNSIGNED NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          KEY ix_mll_user_list (user_id, list_id),
+          KEY ix_mll_message (message_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;');
         foreach ($recipients as $row) {
           $toNum = (string)$row['phone'];
           $name = (string)($row['name'] ?? '');
@@ -103,6 +114,13 @@ foreach ($jobs as $job) {
           $statusText = $res['ok'] ? 'sent' : 'error';
           db()->prepare('INSERT INTO messages (user_id, channel, provider, to_addr, from_addr, body, provider_message_id, status) VALUES (?, "sms", "twilio", ?, ?, ?, ?, ?)')
             ->execute([$uid, $toNum, $from, $msg, (string)($res['provider_message_id'] ?? ''), $statusText]);
+          try {
+            $msgId = (int)db()->lastInsertId();
+            if ($msgId > 0) {
+              db()->prepare('INSERT INTO message_list_links (user_id, list_id, message_id) VALUES (?, ?, ?)')
+                ->execute([ $uid, $listId, $msgId ]);
+            }
+          } catch (Throwable $e) {}
         }
       }
     } else if ($channel === 'email') {
@@ -134,6 +152,17 @@ foreach ($jobs as $job) {
         $rate = rate_for_channel('email');
         $cost = $rate * count($recipients);
         if (!wallet_debit($uid, $cost, 'email_bulk_scheduled', [ 'list_id' => $listId, 'count' => count($recipients) ])) { throw new RuntimeException('Insufficient credits'); }
+        // Ensure link table exists
+        db()->exec('CREATE TABLE IF NOT EXISTS message_list_links (
+          id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+          user_id BIGINT UNSIGNED NOT NULL,
+          list_id BIGINT UNSIGNED NOT NULL,
+          message_id BIGINT UNSIGNED NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          KEY ix_mll_user_list (user_id, list_id),
+          KEY ix_mll_message (message_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;');
         foreach ($recipients as $row) {
           $email = (string)$row['email'];
           $name = (string)($row['name'] ?? '');
@@ -145,6 +174,13 @@ foreach ($jobs as $job) {
           $statusText = $res['ok'] ? 'sent' : 'error';
           db()->prepare('INSERT INTO messages (user_id, channel, provider, to_addr, from_addr, body, provider_message_id, status) VALUES (?, "email", ?, ?, ?, ?, NULL, ?)')
             ->execute([$uid, $provider, $email, $from, $subj . "\n\n" . $msg, $statusText]);
+          try {
+            $msgId = (int)db()->lastInsertId();
+            if ($msgId > 0) {
+              db()->prepare('INSERT INTO message_list_links (user_id, list_id, message_id) VALUES (?, ?, ?)')
+                ->execute([ $uid, $listId, $msgId ]);
+            }
+          } catch (Throwable $e) {}
         }
       }
     }

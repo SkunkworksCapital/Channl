@@ -41,6 +41,10 @@ function route_request(): void {
         $q5->execute([$uid]);
         $msgFailed = (int)$q5->fetchColumn();
 
+        $q6 = db()->prepare('SELECT COUNT(*) FROM messages WHERE user_id = ? AND status = "received"');
+        $q6->execute([$uid]);
+        $msgInbound = (int)$q6->fetchColumn();
+
         // channel breakdown
         $qs1 = db()->prepare('SELECT COUNT(*) FROM messages WHERE user_id = ? AND channel = "sms" AND status = "sent"');
         $qs1->execute([$uid]);
@@ -59,7 +63,7 @@ function route_request(): void {
         $stats = [
           'contacts' => $contactsCount,
           'lists' => $listsCount,
-          'messages' => [ 'total' => $msgTotal, 'sent' => $msgSent, 'failed' => $msgFailed ],
+          'messages' => [ 'total' => $msgTotal, 'sent' => $msgSent, 'failed' => $msgFailed, 'received' => $msgInbound ],
           'sms' => [ 'sent' => $smsSent, 'failed' => $smsFailed ],
           'email' => [ 'sent' => $emailSent, 'failed' => $emailFailed ],
         ];
@@ -158,6 +162,8 @@ function route_request(): void {
   if ($method === 'GET' && $path === '/contacts/new') { ContactsController::newForm(); return; }
   if ($method === 'POST' && $path === '/contacts') { ContactsController::create(); return; }
   if ($method === 'GET' && preg_match('#^/contacts/(\\d+)$#', $path, $m)) { ContactsController::view((int)$m[1]); return; }
+  if ($method === 'GET' && preg_match('#^/contacts/(\\d+)/edit$#', $path, $m)) { ContactsController::editForm((int)$m[1]); return; }
+  if ($method === 'POST' && preg_match('#^/contacts/(\\d+)$#', $path, $m)) { ContactsController::update((int)$m[1]); return; }
   if ($method === 'POST' && preg_match('#^/contacts/(\\d+)/delete$#', $path, $m)) { ContactsController::delete((int)$m[1]); return; }
 
   // Contact Lists
@@ -188,6 +194,12 @@ function route_request(): void {
   if ($method === 'GET' && $path === '/email/send') { EmailController::form(); return; }
   if ($method === 'POST' && $path === '/email/send') { EmailController::send(); return; }
   if ($method === 'GET' && $path === '/email/inbox') { EmailController::inbox(); return; }
+  if ($method === 'POST' && $path === '/webhooks/sendgrid/inbound') { EmailController::sendgridInbound(); return; }
+  if ($method === 'POST' && $path === '/webhooks/sendgrid/events') { EmailController::sendgridEvents(); return; }
+
+  // Analytics
+  require_once BASE_PATH . '/controllers/AnalyticsController.php';
+  if ($method === 'GET' && $path === '/analytics') { AnalyticsController::index(); return; }
 
   // Billing
   require_once BASE_PATH . '/controllers/BillingController.php';
@@ -203,6 +215,8 @@ function route_request(): void {
   // API
   require_once BASE_PATH . '/controllers/ApiController.php';
   if ($method === 'GET' && $path === '/api/balance') { ApiController::balance(); return; }
+  if ($method === 'GET' && $path === '/api/notifications/count') { ApiController::notificationsCount(); return; }
+  if ($method === 'POST' && $path === '/api/notifications/read') { ApiController::notificationsMarkRead(); return; }
 
   // Approvals (admin)
   require_once BASE_PATH . '/controllers/ApprovalsController.php';

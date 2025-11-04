@@ -50,6 +50,11 @@
     <form method="post" action="/sms/send" style="margin-bottom:24px">
       <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
       <input type="hidden" name="send_at" value="">
+      <label for="template_id_single">Template (optional)</label>
+      <select id="template_id_single" name="template_id">
+        <option value="">-- Select template (optional) --</option>
+        <?php foreach ($tplRows as $t) { echo '<option value="' . (int)$t['id'] . '">' . h($t['name']) . '</option>'; } ?>
+      </select>
       <div id="toRow">
         <label for="to">To (E.164, e.g. +15551234567)</label>
         <input id="to" name="to" type="text" required>
@@ -61,7 +66,10 @@
         <button class="btn" type="button" data-action="open-schedule">Schedule…</button>
       </div>
     </form>
+  </div>
 
+  <div class="card">
+    
     <h3>Send from template to a list</h3>
     <form method="post" action="/sms/send">
       <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
@@ -88,8 +96,9 @@
       </div>
       <p class="subtle">Tip: Selecting a template will populate the message. If none is selected, the list's default template is used when available.</p>
     </form>
-    <p><a href="/">Home</a></p>
   </div>
+  <p><a href="/">Home</a></p>
+
   <div class="card">
     <h3>Recent SMS Sent</h3>
     <?php
@@ -121,6 +130,7 @@
       var preview = document.getElementById('tplPreview');
       var bodyBulk = document.getElementById('body_bulk');
       var templateSel = document.getElementById('template_id');
+      var templateSingleSel = document.getElementById('template_id_single');
       var previewBtn = document.getElementById('previewListBtn');
       var listTplMap = <?php echo json_encode($listTplMap ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
       var tplMap = <?php echo json_encode($tplMap ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
@@ -143,6 +153,7 @@
       }
       if(list){ list.addEventListener('change', function(){ sync(); }); }
       if(templateSel){ templateSel.addEventListener('change', function(){ var v = templateSel.value; if(v){ fetchTemplate(v); } sync(); }); }
+      if(templateSingleSel){ templateSingleSel.addEventListener('change', function(){ var v = templateSingleSel.value; if(!v) return; var t = tplMap[v] || tplMap[parseInt(v,10)]; if(t){ var bodySingle = document.getElementById('body_test'); if(bodySingle){ bodySingle.value = t.body || ''; } } }); }
       if(previewBtn){ previewBtn.addEventListener('click', async function(){
         if(!list || !list.value){ alert('Select a list first.'); return; }
         const id = list.value;

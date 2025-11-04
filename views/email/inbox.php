@@ -29,6 +29,7 @@
           <th>From</th>
           <th>To</th>
           <th>Status</th>
+          <th>Opens</th>
           <th>Body</th>
         </tr>
       </thead>
@@ -39,6 +40,7 @@
           <td><?= h($m['from_addr'] ?? '') ?></td>
           <td><?= h($m['to_addr'] ?? '') ?></td>
           <td><?= h($m['status'] ?? '') ?></td>
+          <td><?= isset($m['opens']) ? (int)$m['opens'] : 0 ?><?= isset($m['last_opened_at']) && $m['last_opened_at'] ? ' • ' . h($m['last_opened_at']) : '' ?></td>
           <td><pre><?= h($m['body'] ?? '') ?></pre></td>
         </tr>
       <?php endforeach; ?>

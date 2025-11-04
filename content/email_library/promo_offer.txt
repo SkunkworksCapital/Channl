@@ -1,0 +1,11 @@
+Hi {{first_name}},
+
+Here's an exclusive offer just for you:
+
+Use code {{promo_code}} for {{discount_percent}}% off until {{expiry_date}}.
+
+Claim your offer now: {{promo_link}}
+
+Best,
+{{company_name}}
+

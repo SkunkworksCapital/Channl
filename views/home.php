@@ -31,6 +31,7 @@
               <p style="margin:0">Total: <?= (int)$stats['messages']['total'] ?></p>
               <p style="margin:0;color:#86efac">Sent: <?= (int)$stats['messages']['sent'] ?></p>
               <p style="margin:0;color:#fca5a5">Failed: <?= (int)$stats['messages']['failed'] ?></p>
+              <p style="margin:0;color:#93c5fd">Inbound: <?= (int)($stats['messages']['received'] ?? 0) ?></p>
             </div>
             <div class="card" style="padding:16px;min-width:220px">
               <h3 class="heading" style="margin:0 0 8px 0">SMS</h3>

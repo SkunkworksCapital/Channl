@@ -151,6 +151,8 @@ final class SmsController {
     $listId = isset($_POST['list_id']) ? (int)$_POST['list_id'] : 0;
     $templateId = isset($_POST['template_id']) ? (int)$_POST['template_id'] : 0;
     $sendAtLocal = trim((string)($_POST['send_at'] ?? ''));
+    $redirectParam = trim((string)($_POST['redirect'] ?? ''));
+    $returnTo = ($redirectParam !== '' && $redirectParam[0] === '/') ? $redirectParam : '/sms/send';
     $uid = (int)current_user_id();
     $cfg = $GLOBALS['CONFIG']['integrations']['sms'] ?? [];
     $svc = new SmsTwilio($cfg);
@@ -204,14 +206,14 @@ final class SmsController {
           db()->prepare('INSERT INTO approvals (type, payload, requested_by) VALUES ("sms_bulk", ?, ?)')->execute([$payload, current_user_id()]);
           audit_log('approval.requested', 'list', $listId, ['type' => 'sms_bulk']);
           flash_set('ok', 'Bulk SMS submitted for approval.');
-          redirect('/sms/send');
+          redirect($returnTo);
         } catch (Throwable $e) { /* fallback to direct send below if table creation fails */ }
       }
       // ensure list belongs to user and is SMS channel
       try {
         $chk = db()->prepare('SELECT id FROM contact_lists WHERE id = ? AND user_id = ? AND channel = "sms"');
         $chk->execute([$listId, current_user_id()]);
-        if (!$chk->fetch()) { flash_set('error', 'Selected list is not an SMS list.'); redirect('/sms/send'); }
+        if (!$chk->fetch()) { flash_set('error', 'Selected list is not an SMS list.'); redirect($returnTo); }
       } catch (Throwable $e) {}
       // If a specific template was chosen, load it
       if ($templateId > 0) {
@@ -231,7 +233,7 @@ final class SmsController {
           if ($tplRow && !empty($tplRow['body'])) { $body = (string)$tplRow['body']; }
         } catch (Throwable $e) { /* ignore */ }
       }
-      if ($body === '') { flash_set('error', 'Please select a template or enter a message.'); redirect('/sms/send'); }
+      if ($body === '') { flash_set('error', 'Please select a template or enter a message.'); redirect($returnTo); }
 
       // Scheduling for bulk list send
       if ($sendAtLocal !== '') {
@@ -243,7 +245,7 @@ final class SmsController {
           db()->prepare('INSERT INTO scheduled_jobs (user_id, channel, mode, payload, scheduled_at) VALUES (?, "sms", "list", ?, ?)')
             ->execute([$uid, $payload, $utc]);
           flash_set('ok', 'Bulk SMS scheduled for ' . h($sendAtLocal) . ' (' . h($tz) . ').');
-          redirect('/sms/send');
+          redirect($returnTo);
         }
       }
       $q = db()->prepare('SELECT c.id, c.name, c.email, c.phone, c.country FROM contact_list_members m JOIN contacts c ON c.id = m.contact_id WHERE m.list_id = ? AND c.phone IS NOT NULL');
@@ -258,6 +260,17 @@ final class SmsController {
         redirect('/billing');
       }
       $sent = 0; $failed = 0;
+      // Ensure message_list_links table exists for analytics by list
+      db()->exec('CREATE TABLE IF NOT EXISTS message_list_links (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        list_id BIGINT UNSIGNED NOT NULL,
+        message_id BIGINT UNSIGNED NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY ix_mll_user_list (user_id, list_id),
+        KEY ix_mll_message (message_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;');
       foreach ($recipients as $row) {
         $toNum = (string)$row['phone'];
         $name = (string)($row['name'] ?? '');
@@ -279,16 +292,33 @@ final class SmsController {
         $statusText = $res['ok'] ? 'sent' : 'error';
         $stmt = db()->prepare('INSERT INTO messages (user_id, channel, provider, to_addr, from_addr, body, provider_message_id, status) VALUES (?, "sms", "twilio", ?, ?, ?, ?, ?)');
         $stmt->execute([current_user_id(), $toNum, $from, $personalized, (string)($res['provider_message_id'] ?? ''), $statusText]);
+        try {
+          $msgId = (int)db()->lastInsertId();
+          if ($msgId > 0) {
+            db()->prepare('INSERT INTO message_list_links (user_id, list_id, message_id) VALUES (?, ?, ?)')
+              ->execute([ (int)current_user_id(), $listId, $msgId ]);
+          }
+        } catch (Throwable $e) { /* ignore link errors */ }
         if ($res['ok']) $sent++; else $failed++;
       }
       flash_set('ok', 'Bulk send complete. Sent ' . $sent . ', failed ' . $failed . '.');
       audit_log('sms.bulk_sent', 'list', $listId, ['sent' => $sent, 'failed' => $failed]);
-      redirect('/sms/send');
+      redirect($returnTo);
+    }
+
+    // If a specific template was chosen for single send, load it (overrides body)
+    if ($templateId > 0) {
+      try {
+        $tq = db()->prepare('SELECT body FROM message_templates WHERE id = ? AND user_id = ? AND type = "sms"');
+        $tq->execute([$templateId, current_user_id()]);
+        $t = $tq->fetch();
+        if ($t && !empty($t['body'])) { $body = (string)$t['body']; }
+      } catch (Throwable $e) { /* ignore */ }
     }
 
     if ($to === '' || $body === '') {
       flash_set('error', 'To and body are required.');
-      redirect('/sms/send');
+      redirect($returnTo);
     }
     // Scheduling for single send
     if ($sendAtLocal !== '') {
@@ -300,7 +330,7 @@ final class SmsController {
         db()->prepare('INSERT INTO scheduled_jobs (user_id, channel, mode, payload, scheduled_at) VALUES (?, "sms", "single", ?, ?)')
           ->execute([$uid, $payload, $utc]);
         flash_set('ok', 'SMS scheduled for ' . h($sendAtLocal) . ' (' . h($tz) . ').');
-        redirect('/sms/send');
+        redirect($returnTo);
       }
     }
     // single send credits
@@ -312,7 +342,7 @@ final class SmsController {
     $res = $svc->send($to, $body);
     if (!$res['ok'] && ($res['status'] ?? 0) === 0 && ($res['response'] ?? null) === []) {
       flash_set('error', 'cURL not available on server. Please enable PHP cURL extension.');
-      redirect('/sms/send');
+      redirect($returnTo);
     }
     $stmt = db()->prepare('INSERT INTO messages (user_id, channel, provider, to_addr, from_addr, body, provider_message_id, status) VALUES (?, "sms", "twilio", ?, ?, ?, ?, ?)');
     $statusText = $res['ok'] ? 'sent' : 'error';
@@ -330,7 +360,7 @@ final class SmsController {
       flash_set('error', 'Failed to send (HTTP ' . $code . ').' . $detail);
     }
     audit_log('sms.single_sent', 'message', null, ['to' => $to, 'status' => $statusText]);
-    redirect('/sms/send');
+    redirect($returnTo);
   }
 
   private static function requireAuth(): void {

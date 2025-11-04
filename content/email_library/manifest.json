@@ -1,0 +1,6 @@
+[
+  { "slug": "welcome_email", "name": "Welcome Email", "filename": "welcome_email.txt", "subject": "Welcome to {{company_name}}" },
+  { "slug": "password_reset", "name": "Password Reset", "filename": "password_reset.txt", "subject": "Password reset instructions" },
+  { "slug": "promo_offer", "name": "Promo Offer", "filename": "promo_offer.txt", "subject": "An exclusive offer for you, {{first_name}}" }
+]
+

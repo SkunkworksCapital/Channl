@@ -18,9 +18,9 @@ return [
     'require_bulk_approval' => (function(){ $v = getenv('REQUIRE_BULK_APPROVAL'); if ($v === false) return false; $v = strtolower(trim($v)); return in_array($v, ['1','true','yes','on'], true); })(),
   ],
   'rates' => [
-    'sms' => (float)(getenv('RATE_SMS') ?: 0.03),
-    'whatsapp' => (float)(getenv('RATE_WHATSAPP') ?: 0.02),
-    'email' => (float)(getenv('RATE_EMAIL') ?: 0.002),
+    'sms' => (float)(getenv('RATE_SMS') ?: 0.06),
+    'whatsapp' => (float)(getenv('RATE_WHATSAPP') ?: 0.04),
+    'email' => (float)(getenv('RATE_EMAIL') ?: 0.01),
   ],
   'integrations' => [
     'sms' => [
@@ -41,6 +41,7 @@ return [
       'pass' => getenv('EMAIL_PASS') ?: '',
       'sendgrid_api_key' => getenv('SENDGRID_API_KEY') ?: '',
       'from' => getenv('EMAIL_FROM') ?: 'no-reply@channl.sagejyoung.com',
+      'reply_to' => getenv('EMAIL_REPLY_TO') ?: '',
     ]
   ]
 ];

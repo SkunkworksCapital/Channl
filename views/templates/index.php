@@ -50,6 +50,7 @@
         <p></p>
         <button class="btn btn-primary" type="submit">Save Template</button>
       </form>
+      <p class="subtle" style="margin-top:8px">Personalization tags you can use in body/subject: {{name}}, {{first_name}}, {{email}}, {{phone}}, {{country}}. Tags are replaced from each contact when sending.</p>
       <h3>Saved <?= !empty($filterType) ? strtoupper($filterType) : '' ?></h3>
       <table class="table table-striped">
         <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Subject</th><th>Preview</th><th>Created</th><th></th></tr></thead>
@@ -73,13 +74,18 @@
           <?php endforeach; ?>
         </tbody>
       </table>
-      <?php if (!empty($filterType) && $filterType === 'sms'): ?>
+      <?php if (!empty($filterType) && ($filterType === 'sms' || $filterType === 'email')): ?>
         <h3 style="margin-top:24px">Library</h3>
         <form method="post" action="/templates/import" class="btn-group" style="align-items:flex-start">
           <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+          <input type="hidden" name="library_type" value="<?= h($filterType) ?>">
           <select name="library_slug" style="min-width:280px">
-            <option value="">-- Choose a library SMS template --</option>
-            <?php foreach (($library ?? []) as $lib) { echo '<option value="' . h($lib['slug']) . '">' . h($lib['name']) . '</option>'; } ?>
+            <option value="">-- Choose a library <?= h(strtoupper($filterType)) ?> template --</option>
+            <?php foreach (($library ?? []) as $lib) { 
+              $label = $lib['name'];
+              if ($filterType === 'email' && !empty($lib['subject'])) { $label .= ' — Subject: ' . $lib['subject']; }
+              echo '<option value="' . h($lib['slug']) . '">' . h($label) . '</option>'; 
+            } ?>
           </select>
           <button class="btn btn-primary" type="submit">Import</button>
         </form>

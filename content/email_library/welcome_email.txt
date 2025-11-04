@@ -1,0 +1,14 @@
+Hi {{first_name}},
+
+Welcome to {{company_name}}. We're excited to have you!
+
+Here are a few tips to get started:
+- Update your profile
+- Create your first list
+- Send your first campaign
+
+If you have any questions, reply to this email and our team will help.
+
+Cheers,
+The {{company_name}} Team
+

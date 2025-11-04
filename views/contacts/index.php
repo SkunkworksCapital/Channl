@@ -51,6 +51,7 @@
           <td><?= h($c['created_at']) ?></td>
           <td style="text-align:right">
             <a href="/contacts/<?= (int)$c['id'] ?>" class="btn" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:6px 10px;margin-right:6px;text-decoration:none">View</a>
+            <a href="/contacts/<?= (int)$c['id'] ?>/edit" class="btn" style="background:#334155;color:#fff;border:none;border-radius:8px;padding:6px 10px;margin-right:6px;text-decoration:none">Edit</a>
             <form method="post" action="/contacts/<?= (int)$c['id'] ?>/delete" onsubmit="return confirm('Delete this contact?');" style="display:inline">
               <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
               <button class="btn" type="submit" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer">Delete</button>

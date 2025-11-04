@@ -50,7 +50,7 @@
           <li><span class="tick">✓</span> Virtual Mobile Number</li>
           <li><span class="tick">✓</span> Reporting</li>
         </ul>
-        <a class="btn" href="/billing/buy?package=deliver">Start a Free Trial</a>
+        <a class="btn" href="/billing/buy?package=deliver">BUY NOW</a>
       </div>
       <div class="bundle popular">
         <div class="ribbon">Most Popular!</div>
@@ -66,7 +66,7 @@
           <li><span class="tick">✓</span> SMS Analytics</li>
           <li><span class="tick">✓</span> Auto Top-up</li>
         </ul>
-        <a class="btn" href="/billing/buy?package=grow">Start a Free Trial</a>
+        <a class="btn" href="/billing/buy?package=grow">BUY NOW</a>
       </div>
       <div class="bundle">
         <div class="title">Expand</div>
@@ -81,7 +81,7 @@
           <li><span class="tick">✓</span> SMS Analytics</li>
           <li><span class="tick">✓</span> Auto Top-up</li>
         </ul>
-        <a class="btn" href="/billing/buy?package=expand">Start a Free Trial</a>
+        <a class="btn" href="/billing/buy?package=expand">BUY NOW</a>
       </div>
       <div class="bundle">
         <div class="title">Scale</div>

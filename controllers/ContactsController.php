@@ -44,10 +44,25 @@ final class ContactsController {
 
     $messages = [];
     $phone = $contact['phone'] ?? null;
-    if ($phone) {
-      $q = db()->prepare('SELECT id, provider, to_addr, from_addr, body, provider_message_id, status, price, currency, created_at FROM messages WHERE user_id = ? AND channel = "sms" AND (to_addr = ? OR from_addr = ?) ORDER BY id DESC LIMIT 200');
-      $q->execute([$userId, $phone, $phone]);
-      $messages = $q->fetchAll();
+    $email = $contact['email'] ?? null;
+    try {
+      // Fetch SMS/WhatsApp by phone and Email by email; include both inbound and outbound
+      if ($phone || $email) {
+        // Best-effort: ensure open-tracking columns exist for email messages
+        try { db()->exec('ALTER TABLE messages ADD COLUMN opens INT NOT NULL DEFAULT 0'); } catch (Throwable $e) {}
+        try { db()->exec('ALTER TABLE messages ADD COLUMN last_opened_at DATETIME NULL'); } catch (Throwable $e) {}
+        $clauses = [];
+        $params = [$userId];
+        if ($phone) { $clauses[] = '((channel IN ("sms","whatsapp")) AND (to_addr = ? OR from_addr = ?))'; $params[] = $phone; $params[] = $phone; }
+        if ($email) { $clauses[] = '((channel = "email") AND (to_addr = ? OR from_addr = ?))'; $params[] = $email; $params[] = $email; }
+        $where = implode(' OR ', $clauses);
+        $sql = 'SELECT id, channel, provider, to_addr, from_addr, body, provider_message_id, status, price, currency, opens, last_opened_at, created_at FROM messages WHERE user_id = ? AND (' . $where . ') ORDER BY id DESC LIMIT 1000';
+        $q = db()->prepare($sql);
+        $q->execute($params);
+        $messages = $q->fetchAll();
+      }
+    } catch (Throwable $e) {
+      $messages = [];
     }
 
     view('contacts/view', [ 'contact' => $contact, 'messages' => $messages ]);
@@ -61,6 +76,16 @@ final class ContactsController {
   public static function newForm(): void {
     self::requireAuth();
     view('contacts/new', ['error' => flash_get('error'), 'ok' => flash_get('ok')]);
+  }
+
+  public static function editForm(int $id): void {
+    self::requireAuth();
+    $userId = current_user_id();
+    $stmt = db()->prepare('SELECT id, name, email, phone, country, tags FROM contacts WHERE id = ? AND user_id = ? LIMIT 1');
+    $stmt->execute([$id, $userId]);
+    $contact = $stmt->fetch();
+    if (!$contact) { flash_set('error', 'Contact not found.'); redirect('/contacts'); }
+    view('contacts/edit', ['contact' => $contact, 'error' => flash_get('error'), 'ok' => flash_get('ok')]);
   }
 
   public static function upload(): void {
@@ -123,6 +148,37 @@ final class ContactsController {
       flash_set('ok', 'Contact saved.');
     }
     redirect('/contacts');
+  }
+
+  public static function update(int $id): void {
+    self::requireAuth();
+    require_csrf_or_400();
+    $userId = (int)current_user_id();
+    $name = trim((string)($_POST['name'] ?? '')) ?: null;
+    $emailRaw = trim((string)($_POST['email'] ?? ''));
+    $phoneRaw = trim((string)($_POST['phone'] ?? ''));
+    $country = strtoupper(substr(trim((string)($_POST['country'] ?? '')), 0, 2)) ?: null;
+    $tagsStr = trim((string)($_POST['tags'] ?? ''));
+    $tagList = array_values(array_filter(array_map('trim', explode(',', $tagsStr)), fn($t) => $t !== ''));
+
+    $email = filter_var($emailRaw, FILTER_VALIDATE_EMAIL) ? $emailRaw : null;
+    $phone = self::normalizePhone($phoneRaw);
+
+    try {
+      // ensure contact belongs to user
+      $chk = db()->prepare('SELECT id FROM contacts WHERE id = ? AND user_id = ?');
+      $chk->execute([$id, $userId]);
+      if (!$chk->fetch()) { flash_set('error', 'Contact not found.'); redirect('/contacts'); }
+
+      $tagsJson = !empty($tagList) ? json_encode(array_values(array_unique($tagList))) : null;
+      $stmt = db()->prepare('UPDATE contacts SET name = ?, email = ?, phone = ?, country = ?, tags = ? WHERE id = ? AND user_id = ?');
+      $stmt->execute([$name, $email, $phone, $country, $tagsJson, $id, $userId]);
+      flash_set('ok', 'Contact updated.');
+      redirect('/contacts/' . (int)$id);
+    } catch (Throwable $e) {
+      flash_set('error', 'Failed to update contact.');
+      redirect('/contacts/' . (int)$id . '/edit');
+    }
   }
 
   private static function looksLikeHeader(array $row): bool {

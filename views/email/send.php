@@ -59,7 +59,8 @@
         <button class="btn" type="button" data-action="open-schedule">Schedule…</button>
       </div>
     </form>
-
+  </div>
+  <div class="card">
     <h3>Send from template to a list</h3>
     <form method="post" action="/email/send">
       <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">

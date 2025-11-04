@@ -15,6 +15,12 @@
     input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #374151;background:#0f172a;color:#e5e7eb}
     label{display:block;margin:12px 0 6px}
     .btn{display:inline-block;margin-top:12px;background:#10b981;color:white;padding:10px 14px;border-radius:8px;border:none;cursor:pointer}
+    .boxes{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+    @media (min-width: 900px){ .boxes{grid-template-columns:1fr 1fr} }
+    .box{padding:16px}
+    .box-heading{margin:0 0 8px 0}
+    .box-sms{border-left:4px solid #60a5fa}
+    .box-email{border-left:4px solid #a78bfa}
   </style>
 </head>
 <body>
@@ -66,6 +72,7 @@
           echo '<td>' . h($l['description'] ?? '') . '</td>';
           echo '<td>' . h($l['created_at']) . '</td>';
           echo '<td style="text-align:right">'
+             . '<a class="btn" href="/lists/' . (int)$l['id'] . '" style="background:#2563eb;margin-right:8px">View</a>'
              . '<form method="post" action="/lists/' . (int)$l['id'] . '/delete" onsubmit="return confirm(\'Delete this list?\');" style="display:inline">'
              . '<input type="hidden" name="csrf" value="' . h(csrf_token()) . '">'
              . '<button class="btn" type="submit" style="background:#ef4444">Delete</button>'
@@ -76,10 +83,16 @@
         echo '</tbody></table>';
       }
     ?>
-    <h3>SMS Lists</h3>
-    <?php renderListTable($sms); ?>
-    <h3>Email Lists</h3>
-    <?php renderListTable($email); ?>
+  </div>
+  <div class="boxes">
+    <div class="card box box-sms">
+      <h3 class="box-heading">SMS Lists</h3>
+      <?php renderListTable($sms); ?>
+    </div>
+    <div class="card box box-email">
+      <h3 class="box-heading">Email Lists</h3>
+      <?php renderListTable($email); ?>
+    </div>
   </div>
   </div>
     </div>

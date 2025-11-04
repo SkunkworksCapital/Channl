@@ -38,7 +38,15 @@ final class TemplatesController {
     self::ensureTable();
     $stmt = db()->prepare('SELECT id, name, type, subject, body, created_at FROM message_templates WHERE user_id = ? AND type = "email" ORDER BY id DESC');
     $stmt->execute([current_user_id()]);
-    view('templates/index', ['items' => $stmt->fetchAll(), 'library' => [], 'ok' => flash_get('ok'), 'error' => flash_get('error'), 'filterType' => 'email']);
+    // Load email library manifest
+    $library = [];
+    $manifestPath = BASE_PATH . '/content/email_library/manifest.json';
+    if (is_file($manifestPath)) {
+      $json = file_get_contents($manifestPath);
+      $arr = json_decode($json, true);
+      if (is_array($arr)) $library = $arr;
+    }
+    view('templates/index', ['items' => $stmt->fetchAll(), 'library' => $library, 'ok' => flash_get('ok'), 'error' => flash_get('error'), 'filterType' => 'email']);
   }
 
   public static function create(): void {
@@ -62,8 +70,9 @@ final class TemplatesController {
     require_csrf_or_400();
     self::ensureTable();
     $slug = trim((string)($_POST['library_slug'] ?? ''));
+    $type = in_array(($_POST['library_type'] ?? 'sms'), ['sms','email'], true) ? (string)$_POST['library_type'] : 'sms';
     if ($slug === '') { flash_set('error', 'Select a library template.'); redirect('/templates'); }
-    $manifestPath = BASE_PATH . '/content/sms_library/manifest.json';
+    $manifestPath = BASE_PATH . ($type === 'email' ? '/content/email_library/manifest.json' : '/content/sms_library/manifest.json');
     if (!is_file($manifestPath)) { flash_set('error', 'Library not found.'); redirect('/templates'); }
     $json = file_get_contents($manifestPath);
     $arr = json_decode($json, true);
@@ -71,14 +80,22 @@ final class TemplatesController {
     $entry = null;
     foreach ($arr as $e) { if (isset($e['slug']) && $e['slug'] === $slug) { $entry = $e; break; } }
     if (!$entry) { flash_set('error', 'Template not found.'); redirect('/templates'); }
-    $file = BASE_PATH . '/content/sms_library/' . basename((string)$entry['filename']);
+    $dir = BASE_PATH . ($type === 'email' ? '/content/email_library/' : '/content/sms_library/');
+    $file = $dir . basename((string)$entry['filename']);
     if (!is_file($file)) { flash_set('error', 'Template file missing.'); redirect('/templates'); }
     $body = (string)file_get_contents($file);
     $name = (string)($entry['name'] ?? $slug);
-    $stmt = db()->prepare('INSERT INTO message_templates (user_id, name, type, subject, body) VALUES (?, ?, "sms", NULL, ?)');
-    $stmt->execute([current_user_id(), $name, $body]);
+    if ($type === 'email') {
+      $subject = (string)($entry['subject'] ?? '');
+      if ($subject === '') { $subject = $name; }
+      $stmt = db()->prepare('INSERT INTO message_templates (user_id, name, type, subject, body) VALUES (?, ?, "email", ?, ?)');
+      $stmt->execute([current_user_id(), $name, $subject, $body]);
+    } else {
+      $stmt = db()->prepare('INSERT INTO message_templates (user_id, name, type, subject, body) VALUES (?, ?, "sms", NULL, ?)');
+      $stmt->execute([current_user_id(), $name, $body]);
+    }
     flash_set('ok', 'Template imported from library.');
-    redirect('/templates');
+    redirect('/templates' . ($type === 'email' ? '/email' : '/sms'));
   }
 
   public static function editForm(int $id): void {
